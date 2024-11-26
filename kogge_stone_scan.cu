@@ -36,6 +36,42 @@ __global__ void Kogge_Stone_scan_kernel(float *X, float *Y, unsigned int N) {
     }
 }
 
+__global__ void Kogge_Stone_scan_kernel_double_buffer(float *X, float *Y, unsigned int N) {
+    // Use double buffer to remove the second __syncthreads() call in the original Kogge-Stone scan kernel
+    __shared__ float XY[BLOCK_SIZE];
+    __shared__ float XY_next[BLOCK_SIZE];
+    unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (i < N) {
+        XY[threadIdx.x] = X[i];
+        XY_next[threadIdx.x] = X[i];
+    } else {
+        XY[threadIdx.x] = 0.0f;
+        XY_next[threadIdx.x] = 0.0f;
+    }
+
+    float *input_buffer = XY;
+    float *output_buffer = XY_next;
+
+    for (unsigned int stride = 1; stride < blockDim.x; stride *= 2) {
+        __syncthreads();
+
+        float *temp = input_buffer;
+        input_buffer = output_buffer;
+        output_buffer = temp;
+
+        if (threadIdx.x >= stride) {
+            output_buffer[threadIdx.x] = input_buffer[threadIdx.x - stride] + input_buffer[threadIdx.x];
+        } else {
+            output_buffer[threadIdx.x] = input_buffer[threadIdx.x];
+        }
+    }
+    
+    if (i < N) {
+        Y[i] = output_buffer[threadIdx.x];
+    }
+}
+
 int main() {
     unsigned int N = 16;
     float h_X[N], h_Y[N];
@@ -52,7 +88,7 @@ int main() {
 
     dim3 blockSize(BLOCK_SIZE);
     dim3 gridSize(N / BLOCK_SIZE + 1);
-    Kogge_Stone_scan_kernel<<<gridSize, blockSize>>>(d_X, d_Y, N);
+    Kogge_Stone_scan_kernel_double_buffer<<<gridSize, blockSize>>>(d_X, d_Y, N);
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
         printf("CUDA Error: %s\n", cudaGetErrorString(err));
