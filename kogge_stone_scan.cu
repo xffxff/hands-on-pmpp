@@ -4,10 +4,10 @@
 #include <iostream>
 #include <cuda_runtime.h>
 
-#define SECTION_SIZE 1024
+#define BLOCK_SIZE 8
 
 __global__ void Kogge_Stone_scan_kernel(float *X, float *Y, unsigned int N) {
-    __shared__ float XY[SECTION_SIZE];
+    __shared__ float XY[BLOCK_SIZE];
     unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
     
     if (i < N) {
@@ -23,6 +23,9 @@ __global__ void Kogge_Stone_scan_kernel(float *X, float *Y, unsigned int N) {
             temp += XY[threadIdx.x - stride];
         }
         __syncthreads();
+        // This __syncthreads() call ensures that all threads have read the value of XY[threadIdx.x]
+        // before any thread writes to it. This is necessary because XY[threadIdx.x] might be read
+        // by other threads in the statement `temp += XY[threadIdx.x - stride]`.
         if (threadIdx.x >= stride) {
             XY[threadIdx.x] = temp;
         }
@@ -47,8 +50,8 @@ int main() {
 
     cudaMemcpy(d_X, h_X, N * sizeof(float), cudaMemcpyHostToDevice);
 
-    dim3 blockSize(N);
-    dim3 gridSize(1);
+    dim3 blockSize(BLOCK_SIZE);
+    dim3 gridSize(N / BLOCK_SIZE + 1);
     Kogge_Stone_scan_kernel<<<gridSize, blockSize>>>(d_X, d_Y, N);
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
