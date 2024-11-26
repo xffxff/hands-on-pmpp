@@ -77,35 +77,55 @@ int main() {
     float h_X[N], h_Y[N];
     float *d_X, *d_Y;
 
+    // Initialize input array
     for (unsigned int i = 0; i < N; i++) {
         h_X[i] = static_cast<float>(i + 1);
     }
 
+    // Allocate device memory
     cudaMalloc((void**)&d_X, N * sizeof(float));
     cudaMalloc((void**)&d_Y, N * sizeof(float));
 
+    // Copy input data to device
     cudaMemcpy(d_X, h_X, N * sizeof(float), cudaMemcpyHostToDevice);
 
     dim3 blockSize(BLOCK_SIZE);
     dim3 gridSize(N / BLOCK_SIZE + 1);
-    Kogge_Stone_scan_kernel_double_buffer<<<gridSize, blockSize>>>(d_X, d_Y, N);
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("CUDA Error: %s\n", cudaGetErrorString(err));
+
+    void (*kernels[])(float*, float*, unsigned int) = {
+        Kogge_Stone_scan_kernel,
+        Kogge_Stone_scan_kernel_double_buffer
+    };
+    const char* kernel_names[] = {
+        "Original Kogge-Stone",
+        "Double Buffer Kogge-Stone"
+    };
+
+    // Run both kernels
+    for (int k = 0; k < 2; k++) {
+        std::cout << "\n=== " << kernel_names[k] << " Kernel ===\n";
+        
+        kernels[k]<<<gridSize, blockSize>>>(d_X, d_Y, N);
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess) {
+            printf("CUDA Error: %s\n", cudaGetErrorString(err));
+            return 1;
+        }
+
+        cudaMemcpy(h_Y, d_Y, N * sizeof(float), cudaMemcpyDeviceToHost);
+
+        std::cout << "Input:  ";
+        for (unsigned int i = 0; i < N; i++) {
+            std::cout << h_X[i] << " ";
+        }
+        std::cout << "\nOutput: ";
+        for (unsigned int i = 0; i < N; i++) {
+            std::cout << h_Y[i] << " ";
+        }
+        std::cout << std::endl;
     }
 
-    cudaMemcpy(h_Y, d_Y, N * sizeof(float), cudaMemcpyDeviceToHost);
-
-    std::cout << "Input: ";
-    for (unsigned int i = 0; i < N; i++) {
-        std::cout << h_X[i] << " ";
-    }
-    std::cout << "\nOutput: ";
-    for (unsigned int i = 0; i < N; i++) {
-        std::cout << h_Y[i] << " ";
-    }
-    std::cout << std::endl;
-
+    // Free device memory
     cudaFree(d_X);
     cudaFree(d_Y);
 
