@@ -5,25 +5,23 @@ __global__ void BlockScanExclusiveSumKernel(int *d_input, int *d_output, int num
     __shared__ typename cub::BlockScan<int, 128>::TempStorage temp_storage;
 
     int thread_idx = threadIdx.x;
-    int block_offset = blockIdx.x * blockDim.x;
 
-    int input = 0;
-    if (block_offset + thread_idx < num_elements) {
-        input = d_input[block_offset + thread_idx];
+    int thread_data[2];
+    for (int i = 0; i < 2; i++) {
+        thread_data[i] = d_input[thread_idx * 2 + i];
     }
 
-    int output = 0;
-    cub::BlockScan<int, 128>(temp_storage).InclusiveSum(input, output);
+    cub::BlockScan<int, 128>(temp_storage).InclusiveSum(thread_data, thread_data);
 
-    if (block_offset + thread_idx < num_elements) {
-        d_output[block_offset + thread_idx] = output;
+    for (int i = 0; i < 2; i++) {
+        d_output[thread_idx * 2 + i] = thread_data[i];
     }
 }
 
 int main() {
     const int num_elements = 256;
     const int block_size = 128;
-    const int num_blocks = (num_elements + block_size - 1) / block_size;
+    const int num_blocks = 1;
 
     int h_input[num_elements];
     int h_output[num_elements];
