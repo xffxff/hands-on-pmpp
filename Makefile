@@ -5,7 +5,7 @@ NVCC = nvcc
 NVCC_FLAGS = -arch=sm_90
 
 # Source files with correct path
-SOURCES = parallel_scan/brent_kung_scan.cu parallel_scan/kogge_stone_scan.cu
+SOURCES = parallel_scan/brent_kung_scan.cu parallel_scan/kogge_stone_scan.cu parallel_scan/cub_block_scan.cu
 
 # Generate executable names by replacing .cu with nothing
 EXECUTABLES = $(basename $(notdir $(SOURCES)))
