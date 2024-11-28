@@ -1,22 +1,25 @@
 #include <cub/block/block_scan.cuh>
+#include <cub/cub.cuh>
 #include <iostream>
+
 
 __global__ void BlockScanExclusiveSumKernel(int *d_input, int *d_output, int num_elements) {
     __shared__ typename cub::BlockScan<int, 128>::TempStorage temp_storage;
 
-    int thread_idx = threadIdx.x;
+    using BlockLoad = cub::BlockLoad<int, 128, 2>;
+    __shared__ typename BlockLoad::TempStorage temp_storage_load;
+
+    using BlockStore = cub::BlockStore<int, 128, 2>;
+    __shared__ typename BlockStore::TempStorage temp_storage_store;
 
     int thread_data[2];
-    for (int i = 0; i < 2; i++) {
-        thread_data[i] = d_input[thread_idx * 2 + i];
-    }
+    BlockLoad(temp_storage_load).Load(d_input, thread_data);
 
     cub::BlockScan<int, 128>(temp_storage).InclusiveSum(thread_data, thread_data);
 
-    for (int i = 0; i < 2; i++) {
-        d_output[thread_idx * 2 + i] = thread_data[i];
-    }
+    BlockStore(temp_storage_store).Store(d_output, thread_data);
 }
+
 
 int main() {
     const int num_elements = 256;
