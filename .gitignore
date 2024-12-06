@@ -60,3 +60,6 @@ release/
 .Trashes
 ehthumbs.db
 Thumbs.db 
+.hypothesis/
+__pycache__/
+*.egg-info/
