@@ -63,3 +63,4 @@ Thumbs.db
 .hypothesis/
 __pycache__/
 *.egg-info/
+.pytest_cache/
